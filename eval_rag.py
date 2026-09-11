@@ -24,10 +24,20 @@ def recall_at_k(query, expected, k=3):
             return True
     return False
 
+def precision_at_k(query, expected, k=3):
+    """检索侧精确率：前 k 个结果里真正相关（含期望关键词）的比例"""
+    docs = backend.retrieve_documents(query, k=k)
+    if not docs:
+        return 0.0
+    hit = sum(1 for d in docs if any(kw in d.page_content for kw in expected))
+    return hit / len(docs)
+
 async def main():
-    # 1. 检索侧 recall@3（零 LLM 成本）
+    # 1. 检索侧 recall@3 与 precision@3（零 LLM 成本）
     rec = sum(recall_at_k(q["query"], q["expected"]) for q in EVAL_SET)
-    print(f"=== recall@3: {rec}/{len(EVAL_SET)} = {rec / len(EVAL_SET):.0%} ===")
+    prec = sum(precision_at_k(q["query"], q["expected"]) for q in EVAL_SET) / len(EVAL_SET)
+    print(f"=== recall@3:   {rec}/{len(EVAL_SET)} = {rec / len(EVAL_SET):.0%} ===")
+    print(f"=== precision@3: 平均 {prec:.0%} ===")
     for q in EVAL_SET:
         print(f"[{'OK' if recall_at_k(q['query'], q['expected']) else 'XX'}] {q['query']}")
 
