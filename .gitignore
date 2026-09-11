@@ -1,0 +1,51 @@
+# ---------- 环境与依赖（体积大，克隆后自行安装） ----------
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+.idea/
+chroma_db/
+
+# ---------- 构建产物与调试残留 ----------
+pet-frontend/dist/
+pet-frontend/_dbg.mjs
+
+# ---------- 运行时数据（隐私，不入库） ----------
+sessions/
+uploads/
+resources/checkpoint.db*
+
+# ---------- 个人学习文件（与项目无关） ----------
+3.py
+4.py
+for.py
+for嵌套.py
+九九乘法表.py
+函数.py
+列表.py
+列表练习.py
+字典.py
+对象.py
+异常.py
+循环综合.py
+文件.py
+模块.py
+练习1.py
+练习2.py
+链接mysql.py
+图表.py
+my_package/
+my_utils/
+my_module1.py
+streamlit.py
+pet_agent.py
+main.py
+backend1.py
+后端复现.py
+DeepSeek-API_text.py
+test.py
+render.html
+debug_screenshot.png
+代码改造全记录.md
+优化说明.md
+深圳AI应用开发岗求职竞争力评估.html
