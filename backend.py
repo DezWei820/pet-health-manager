@@ -46,7 +46,7 @@ DB_USER = "root"
 DB_PASSWORD = os.getenv("DB_PASSWORD", "123456")
 DB_NAME = "pet"
 
-SECRET_KEY = "your-secret-key-change-in-production"
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
