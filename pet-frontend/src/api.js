@@ -52,8 +52,9 @@ export async function streamChat(data, onToken, onError) {
         if (line.startsWith('event:')) {
           event = line.slice(6).trim()
         } else if (line.startsWith('data:')) {
-          const payload = line.slice(5).trim()
-          if (event === 'token') onToken(payload)
+          // 只去 SSE 约定的前导空格，保留内容（含尾部空白）；后端把 \n 转义为字面 \n，这里还原
+          const payload = line.slice(5).replace(/^ /, '')
+          if (event === 'token') onToken(payload.replace(/\\n/g, '\n'))
           else if (event === 'error') onError(payload)
         }
       }

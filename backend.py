@@ -463,7 +463,8 @@ async def ai_chat_stream(request: ChatRequest, current_user: str = Depends(get_c
                     if isinstance(content, list):  # 兼容多内容块格式
                         content = "".join(c.get("text", "") if isinstance(c, dict) else str(c) for c in content)
                     reply += content
-                    yield {"event": "token", "data": content}
+                    # SSE 中 \n 是帧分隔符，需转义为字面 \n 再发送，前端还原，否则换行会丢失
+                    yield {"event": "token", "data": content.replace("\n", "\\n")}
         except Exception as e:
             yield {"event": "error", "data": str(e)}
         # 流式结束后把对话落库（仅当属于某个会话）
