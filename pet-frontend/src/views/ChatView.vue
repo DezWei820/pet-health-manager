@@ -170,7 +170,9 @@ onMounted(async () => {
           开始和 AI 助手聊聊吧～
         </div>
         <div v-for="(m, i) in msgs" :key="i" class="bubble" :class="m.role === 'user' ? 'user' : 'ai'">
-          <div v-html="renderMd(m.content)"></div><span v-if="typing && i === msgs.length - 1" class="cursor">▌</span>
+          <!-- 流式进行中：纯文本显示（保留换行），避免半截 Markdown 渲染成一团；结束后再渲染 -->
+          <div v-if="typing && i === msgs.length - 1" style="white-space:pre-wrap;word-break:break-word;">{{ m.content }}<span class="cursor">▌</span></div>
+          <div v-else v-html="renderMd(m.content)"></div>
         </div>
         <div v-if="err" class="msg err">{{ err }}</div>
       </div>
