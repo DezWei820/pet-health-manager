@@ -37,11 +37,11 @@ from langchain_core.messages import AIMessageChunk
 from rank_bm25 import BM25Okapi
 from PIL import Image
 import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+pytesseract.pytesseract.tesseract_cmd = os.getenv("TESSERACT_CMD", r"C:\Program Files\Tesseract-OCR\tesseract.exe")
 import jieba
 
 # ---------- 配置 ----------
-DB_HOST = "localhost"
+DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_USER = "root"
 DB_PASSWORD = os.getenv("DB_PASSWORD", "123456")
 DB_NAME = "pet"
@@ -55,7 +55,7 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "your-deepseek-api-key")
 
 # ---------- Redis 缓存 ----------
 redis_client = aioredis.from_url(
-    "redis://localhost:6379/0", decode_responses=True,
+    os.getenv("REDIS_URL", "redis://localhost:6379/0"), decode_responses=True,
     socket_connect_timeout=1, socket_timeout=1, protocol=2
 )
 _redis_ok = True  # Redis 熔断：故障后每 10s 放行一次探活，恢复后自动回归缓存

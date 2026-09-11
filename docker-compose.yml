@@ -1,0 +1,55 @@
+# 一键部署：MySQL + Redis + 后端 + 前端
+# 用法：docker compose up -d --build  然后访问 http://localhost:8080
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-123456}
+      MYSQL_DATABASE: pet
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD:-123456}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+
+  backend:
+    build: .
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-123456}
+      DB_NAME: pet
+      REDIS_URL: redis://redis:6379/0
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      AMAP_KEY: ${AMAP_KEY}
+      WEB_SEARCH_KEY: ${WEB_SEARCH_KEY}
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      TESSERACT_CMD: /usr/bin/tesseract
+    volumes:
+      # 复用宿主机已下载的 AI 模型缓存（bge-small-zh / bge-reranker），避免重复下载
+      - "C:/Users/weidezhao/.cache/huggingface:/root/.cache/huggingface"
+      - ./data:/app/data
+      - ./resources:/app/resources
+      - ./chroma_db:/app/chroma_db
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./pet-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  mysql_data:

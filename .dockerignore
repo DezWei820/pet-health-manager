@@ -1,0 +1,13 @@
+.venv
+__pycache__
+*.pyc
+.git
+.gitignore
+tests
+data
+chroma_db
+resources/checkpoint.db
+pet-frontend/node_modules
+pet-frontend/dist
+pet-frontend/_dbg.mjs
+README.md
