@@ -20,7 +20,7 @@ from . import db
 from .db import cache_get, cache_set, cache_del
 from .auth import hash_password, verify_password, create_access_token, get_current_user
 from .rag import retrieve_documents, rag_answer  # re-export：供 eval_rag.py / tests 使用
-from .agent import agent, init_agent, close_agent
+from .agent import init_agent, close_agent
 
 # ---------- Pydantic 模型 ----------
 class UserRegister(BaseModel):
@@ -50,10 +50,13 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[int] = None
 
 # ---------- 生命周期 ----------
+agent = None  # 由 lifespan 中的 init_agent() 赋值（避免 from .agent import agent 拷贝 None 引用）
+
 @asynccontextmanager
 async def lifespan(app):
+    global agent
     await db.init_pool()   # MySQL 连接池 + 会话表
-    await init_agent()     # LangGraph Agent + checkpointer（需要事件循环）
+    agent = await init_agent()  # LangGraph Agent + checkpointer（需要事件循环）
     yield
     await db.close_pool()
     await close_agent()

@@ -167,6 +167,7 @@ async def init_agent():
     checkpointer = AsyncSqliteSaver(await aiosqlite.connect("resources/checkpoint.db"))
     await checkpointer.setup()
     agent = create_agent(llm, tools, system_prompt=system_prompt, checkpointer=checkpointer, middleware=[middleware])
+    return agent
 
 async def close_agent():
     await checkpointer.conn.close()
