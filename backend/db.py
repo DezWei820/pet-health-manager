@@ -4,7 +4,7 @@ import os
 import time
 import aiomysql
 import redis.asyncio as aioredis
-from config import DB_HOST, DB_USER, DB_PASSWORD, DB_NAME
+from .config import DB_HOST, DB_USER, DB_PASSWORD, DB_NAME
 
 # ---------- Redis 缓存 ----------
 redis_client = aioredis.from_url(

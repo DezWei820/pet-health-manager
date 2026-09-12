@@ -15,12 +15,12 @@ from sse_starlette.sse import EventSourceResponse
 from langchain_core.messages import AIMessageChunk
 from PIL import Image
 
-import config  # 配置、LLM、OCR 路径（先导入：设置 HF_HUB_OFFLINE 等环境变量）
-import db
-from db import cache_get, cache_set, cache_del
-from auth import hash_password, verify_password, create_access_token, get_current_user
-from rag import retrieve_documents, rag_answer  # re-export：供 eval_rag.py / tests 使用
-from agent import agent, init_agent, close_agent
+from . import config  # 配置、LLM、OCR 路径（先导入：设置 HF_HUB_OFFLINE 等环境变量）
+from . import db
+from .db import cache_get, cache_set, cache_del
+from .auth import hash_password, verify_password, create_access_token, get_current_user
+from .rag import retrieve_documents, rag_answer  # re-export：供 eval_rag.py / tests 使用
+from .agent import agent, init_agent, close_agent
 
 # ---------- Pydantic 模型 ----------
 class UserRegister(BaseModel):

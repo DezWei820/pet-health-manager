@@ -10,10 +10,10 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langchain.agents import create_agent
 from langchain.agents.middleware import SummarizationMiddleware
 
-import db
-from db import cache_get, cache_set
-from config import llm
-from rag import rag_answer
+from . import db
+from .db import cache_get, cache_set
+from .config import llm
+from .rag import rag_answer
 
 # ---------- AI 工具定义 ----------
 @tool

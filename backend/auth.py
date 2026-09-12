@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta
 from fastapi import HTTPException, Header
 from jose import JWTError, jwt
-from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from .config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
 # ---------- 密码哈希 ----------
 def hash_password(password: str) -> str:

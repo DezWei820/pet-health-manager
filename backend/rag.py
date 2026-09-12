@@ -19,8 +19,8 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from sentence_transformers import CrossEncoder
 from langchain_core.documents import Document
 
-from db import cache_get, cache_set
-from config import llm
+from .db import cache_get, cache_set
+from .config import llm
 
 # ---------- 1. 加载文档（支持 txt, pdf, docx, 图片 OCR；所有类型统一数据清洗） ----------
 def clean_text(text):

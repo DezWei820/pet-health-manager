@@ -43,7 +43,13 @@ graph LR
 
 ```
 PythonProject/
-├── backend.py              # FastAPI 主服务（Agent/RAG/认证/OCR/缓存）
+├── backend/                # 后端包
+│   ├── main.py             # FastAPI 入口：app + 生命周期 + 全部路由
+│   ├── config.py           # 全局配置：环境变量 / LLM / OCR
+│   ├── db.py               # 数据层：MySQL 连接池 + Redis 缓存（熔断）
+│   ├── auth.py             # 安全层：密码哈希 + JWT
+│   ├── rag.py              # 检索层：加载/去重/切分/多路召回/重排序/证据
+│   └── agent.py            # 智能层：5 个工具 + LangGraph Agent 构建
 ├── mcp_server.py           # MCP 协议服务器
 ├── eval_rag.py             # RAG 评测脚本（recall / precision）
 ├── tests/                  # pytest 单测（JWT/宠物 CRUD/RAG 召回）
