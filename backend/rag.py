@@ -175,7 +175,7 @@ def retrieve_documents(query, k=5, use_bm25=True, use_vector=True, fusion="rrf",
         # BM25 侧同样按日期过滤，两路口径一致
         if min_int:
             top_indices = [i for i in top_indices if int(docs[i].metadata.get("date") or 0) >= min_int]
-        top_indices = top_indices[:k]
+        top_indices = top_indices[:k * 2]  # 扩大候选池再融合，避免单路高排名块被 RRF 挤出
         bm25_docs = [docs[i] for i in top_indices]
         candidates.append(("bm25", bm25_docs))
     # RRF 融合

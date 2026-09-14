@@ -16,49 +16,55 @@ from .config import llm
 from .rag import rag_answer
 
 # ---------- AI 工具定义 ----------
-@tool
-async def get_pet_logs(pet_id: int, hours: int = 168) -> str:
-    """
-        获取指定宠物最近 hours 小时的行为日志，并分析这些行为的时间间隔是否正常，如果不正常（例如：三小时前刚记录了一次排泄，三小时后又排泄了一次，或者每天睡觉时间过长/过短），请分析异常，并将分析结果返回 JSON 字符串。
+def _user_tools(username):
+    """绑定当前用户的档案/日志工具（SQL 加 user 条件，防止 LLM 被诱导跨用户取数）"""
+    @tool
+    async def get_pet_logs(pet_id: int, hours: int = 168) -> str:
+        """
+            获取指定宠物最近 hours 小时的行为日志，并分析这些行为的时间间隔是否正常，如果不正常（例如：三小时前刚记录了一次排泄，三小时后又排泄了一次，或者每天睡觉时间过长/过短），请分析异常，并将分析结果返回 JSON 字符串。
+            参数：
+            - pet_id: 宠物ID
+            - hours: 小时数，默认168(一周)
+            """
+        async with db.POOL.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute(
+                    """
+                    SELECT l.log_type, l.description, l.log_time
+                    FROM daily_logs l
+                    JOIN pets p ON p.id = l.pet_id
+                    WHERE l.pet_id = %s AND p.user_id = (SELECT id FROM users WHERE username = %s)
+                      AND l.log_time >= NOW() - INTERVAL %s HOUR
+                    ORDER BY l.log_time DESC
+                    """,
+                    (pet_id, username, hours)
+                )
+                logs = await cursor.fetchall()
+                for log in logs:
+                    log["log_time"] = log["log_time"].strftime("%Y-%m-%d %H:%M:%S")
+                await conn.commit()  # 释放只读事务，避免连接池残留旧快照
+                return json.dumps(logs, ensure_ascii=False)
+
+    @tool
+    async def get_pet_profile(pet_id: int) -> str:
+        """
+        获取指定宠物的基本信息档案（名字、种类、品种、年龄、体重），用于个性化回答。
         参数：
         - pet_id: 宠物ID
-        - hours: 小时数，默认168(一周)
         """
-    async with db.POOL.acquire() as conn:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                """
-                SELECT log_type, description, log_time
-                FROM daily_logs
-                WHERE pet_id = %s AND log_time >= NOW() - INTERVAL %s HOUR
-                ORDER BY log_time DESC
-                """,
-                (pet_id, hours)
-            )
-            logs = await cursor.fetchall()
-            for log in logs:
-                log["log_time"] = log["log_time"].strftime("%Y-%m-%d %H:%M:%S")
-            await conn.commit()  # 释放只读事务，避免连接池残留旧快照
-            return json.dumps(logs, ensure_ascii=False)
+        async with db.POOL.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute(
+                    "SELECT id, name, species, breed, age, weight FROM pets WHERE id = %s AND user_id = (SELECT id FROM users WHERE username = %s)",
+                    (pet_id, username)
+                )
+                pet = await cursor.fetchone()
+                await conn.commit()  # 释放只读事务，避免连接池残留旧快照
+                if not pet:
+                    return json.dumps({"error": "宠物不存在"}, ensure_ascii=False)
+                return json.dumps(pet, ensure_ascii=False, default=str)
 
-@tool
-async def get_pet_profile(pet_id: int) -> str:
-    """
-    获取指定宠物的基本信息档案（名字、种类、品种、年龄、体重），用于个性化回答。
-    参数：
-    - pet_id: 宠物ID
-    """
-    async with db.POOL.acquire() as conn:
-        async with conn.cursor() as cursor:
-            await cursor.execute(
-                "SELECT id, name, species, breed, age, weight FROM pets WHERE id = %s",
-                (pet_id,)
-            )
-            pet = await cursor.fetchone()
-            await conn.commit()  # 释放只读事务，避免连接池残留旧快照
-            if not pet:
-                return json.dumps({"error": "宠物不存在"}, ensure_ascii=False)
-            return json.dumps(pet, ensure_ascii=False, default=str)
+    return [get_pet_logs, get_pet_profile, search_nearby_hospitals, search_knowledge_base, web_search]
 
 @tool
 async def search_nearby_hospitals(city: str) -> str:
@@ -126,8 +132,21 @@ async def web_search(query: str) -> str:
     except Exception:
         return json.dumps({"error": "搜索失败"}, ensure_ascii=False)
 
-# ---------- 初始化 LLM 和 Agent ----------
-tools = [get_pet_logs, get_pet_profile, search_nearby_hospitals, search_knowledge_base, web_search]
+# ---------- Agent 构建 ----------
+checkpointer = None
+
+async def init_agent():
+    """lifespan 中初始化 checkpointer（需要事件循环）"""
+    global checkpointer
+    checkpointer = AsyncSqliteSaver(await aiosqlite.connect("resources/checkpoint.db"))
+    await checkpointer.setup()
+
+def build_agent(username):
+    """按请求构建绑定当前用户的 Agent（档案/日志工具已限定归属，checkpointer 全局共享）"""
+    return create_agent(llm, _user_tools(username), system_prompt=system_prompt, checkpointer=checkpointer, middleware=[middleware])
+
+async def close_agent():
+    await checkpointer.conn.close()
 
 # 使用新版 create_agent 构建 Agent
 system_prompt = """
@@ -157,17 +176,3 @@ middleware = SummarizationMiddleware(
     trigger=("messages", 3),
     keep=("messages", 1)
 )
-
-# ---------- Agent 构建（lifespan 中调用；checkpointer 需要事件循环） ----------
-agent = None
-checkpointer = None
-
-async def init_agent():
-    global agent, checkpointer
-    checkpointer = AsyncSqliteSaver(await aiosqlite.connect("resources/checkpoint.db"))
-    await checkpointer.setup()
-    agent = create_agent(llm, tools, system_prompt=system_prompt, checkpointer=checkpointer, middleware=[middleware])
-    return agent
-
-async def close_agent():
-    await checkpointer.conn.close()

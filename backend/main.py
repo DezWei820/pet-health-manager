@@ -20,7 +20,7 @@ from . import db
 from .db import cache_get, cache_set, cache_del
 from .auth import hash_password, verify_password, create_access_token, get_current_user
 from .rag import retrieve_documents, rag_answer  # re-export：供 eval_rag.py / tests 使用
-from .agent import init_agent, close_agent
+from .agent import init_agent, close_agent, build_agent
 
 # ---------- Pydantic 模型 ----------
 class UserRegister(BaseModel):
@@ -50,13 +50,10 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[int] = None
 
 # ---------- 生命周期 ----------
-agent = None  # 由 lifespan 中的 init_agent() 赋值（避免 from .agent import agent 拷贝 None 引用）
-
 @asynccontextmanager
 async def lifespan(app):
-    global agent
     await db.init_pool()   # MySQL 连接池 + 会话表
-    agent = await init_agent()  # LangGraph Agent + checkpointer（需要事件循环）
+    await init_agent()     # LangGraph checkpointer（需要事件循环）
     yield
     await db.close_pool()
     await close_agent()
@@ -282,8 +279,8 @@ async def ai_chat(request: ChatRequest, current_user: str = Depends(get_current_
     user_message = context + "\n用户问题：" + request.message
 
     try:
-        # create_agent 返回的 agent 可以直接 invoke，传入 messages 列表
-        result = await agent.ainvoke({"messages": [{"role": "user", "content": user_message}]}, config)
+        # 每次请求构建绑定当前用户的 Agent（工具已限定归属，防止跨用户越权）
+        result = await build_agent(current_user).ainvoke({"messages": [{"role": "user", "content": user_message}]}, config)
         # 从结果中提取最后一条 AI 消息的内容
         reply = result["messages"][-1].content
         return {"reply": reply}
@@ -293,6 +290,16 @@ async def ai_chat(request: ChatRequest, current_user: str = Depends(get_current_
 # ---------- AI 流式聊天路由（SSE） ----------
 @app.post("/api/ai/chat/stream")
 async def ai_chat_stream(request: ChatRequest, current_user: str = Depends(get_current_user)):
+    # 会话归属校验：防止跨用户向他人会话写入消息
+    if request.conversation_id:
+        async with db.POOL.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute(
+                    "SELECT id FROM conversations WHERE id = %s AND user_id = (SELECT id FROM users WHERE username = %s)",
+                    (request.conversation_id, current_user)
+                )
+                if not await cursor.fetchone():
+                    raise HTTPException(status_code=404, detail="会话不存在")
     # 每个会话独立 thread_id，agent 按会话隔离上下文
     thread_id = request.conversation_id or current_user
     config = {"configurable": {"thread_id": thread_id, "recursion_limit": 50}}
@@ -306,7 +313,7 @@ async def ai_chat_stream(request: ChatRequest, current_user: str = Depends(get_c
         try:
             # stream_mode="messages" 逐 token 返回 AI 消息增量，实现真正的流式输出
             # 仅推送 model 节点的增量，过滤 SummarizationMiddleware 生成的摘要 token
-            async for chunk, meta in agent.astream(
+            async for chunk, meta in build_agent(current_user).astream(
                 {"messages": [{"role": "user", "content": user_message}]}, config, stream_mode="messages"):
                 if meta.get("langgraph_node") == "model" and isinstance(chunk, AIMessageChunk) and chunk.content:
                     content = chunk.content
